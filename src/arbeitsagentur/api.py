@@ -1,7 +1,10 @@
+import time
 from typing import Any
 import base64
 import httpx
 import uuid
+
+from urllib.parse import quote
 
 from .dtypes import SearchResponse, VacancyDetails, VacancySearchResponse
 from .endpoints import ArbeitsagenturApiEndpoints
@@ -37,21 +40,27 @@ class ArbeitsagenturApi:
         params: dict[str, Any] = {},
         headers: dict[str, str] = {},
     ) -> httpx.Response:
-        response = httpx.get(
-            url=url,
-            params=params,
-            headers=headers if len(headers) > 0 else self.headers,
-            cookies=self.cookies,
-        )
-        return response
+        try:
+            response = httpx.get(
+                url=url,
+                params=params,
+                headers=headers if len(headers) > 0 else self.headers,
+                cookies=self.cookies,
+            )
+            return response
+        except Exception as e:
+            print(e)
+            time.sleep(3)
+            return self._make_get_request(url, params, headers)
 
     def _make_post_request(self, url: str, data: dict[str, Any]) -> httpx.Response:
-        return httpx.post(
+        response = httpx.post(
             url=url,
             json=data,
             headers=self.headers,
             cookies=self.cookies,
         )
+        return response
 
     def search(
         self,
@@ -112,7 +121,7 @@ class ArbeitsagenturApi:
             return response["challengeId"], captcha_answer
         return response["challengeId"], None
 
-    def details(self, id: str) -> VacancyDetails:
+    def details(self, id: str) -> VacancyDetails | None:
         headers = self.headers.copy()
 
         challenge_id, captcha_answer = self.get_challenge_uuid()
@@ -122,25 +131,27 @@ class ArbeitsagenturApi:
         if captcha_answer:
             headers["aas-answer"] = captcha_answer
 
+        print(headers, id)
         response = self._make_get_request(
             headers=headers,
             url=ArbeitsagenturApiEndpoints.DETAILS.format(
                 id=self.encode_string_to_base64(id)
             ),
         ).json()
+        print(response)
 
         if response.get("angebotskontakt") is None:
-            return self.details(id)
+            return None
 
         contact = response["angebotskontakt"]
         return VacancyDetails(
             title="",
-            company=contact["firma"],
-            address=" ".join(contact["postadresse"].values()),
+            company=contact.get("firma", ""),
+            address=" ".join(contact.get("postadresse", {}).values()),
             phone_number="".join(contact["telefonnummer"].values())
             if contact.get("telefonnummer") is not None
             else "",
-            email=contact["emailadresse"],
+            email=contact.get("emailadresse", ""),
             url=f"https://www.arbeitsagentur.de/jobsuche/jobdetail/{id}",
         )
 
