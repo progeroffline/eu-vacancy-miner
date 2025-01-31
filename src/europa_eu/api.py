@@ -52,42 +52,44 @@ class EuropeEuApi:
         self,
         page: int = 1,
         size: int = 50,
-    ) -> list[str]:
+        params: dict[str, Any] = {},
+    ) -> tuple[list[str], int]:
+        json_data = {
+            "sortSearch": params.get("sortSearch", "BEST_MATCH"),
+            "keywords": [
+                {"keyword": keyword, "specificSearchCode": "EVERYWHERE"}
+                for keyword in params.get("keywordsEverywhere", "").split(",")
+                if params.get("keywordsEverywhere")
+            ],
+            "publicationPeriod": params.get("publicationPeriod", "LAST_DAY"),
+            "occupationUris": params.get(
+                "occupationUris", ["http://data.europa.eu/esco/isco/C9"]
+            ),
+            "skillUris": params.get("skillUris", []),
+            "requiredExperienceCodes": params.get("requiredExperienceCodes", []),
+            "positionScheduleCodes": params.get("positionScheduleCodes", "").split(","),
+            "educationAndQualificationLevelCodes": params.get(
+                "educationAndQualificationLevelCodes", []
+            ),
+            "positionOfferingCodes": params.get("positionOfferingCodes", []),
+            "locationCodes": params.get("locationCodes", "").split(","),
+            "euresFlagCodes": params.get("euresFlagCodes", []),
+            "requiredLanguages": params.get("requiredLanguages", []),
+            "resultsPerPage": size,
+            "page": page,
+            "minNumberPost": params.get("minNumberPost", None),
+            "sessionId": params.get("sessionId", "t8y2effv1rb0pma47adsku"),
+        }
+
+        if params.get("otherBenefitsCodes"):
+            json_data["otherBenefitsCodes"] = params["otherBenefitsCodes"].split(",")
+        if params.get("sector"):
+            json_data["sectorCodes"] = params.get("sector", "").split(",")
         response = self._make_post_request(
             EuropeEuApiEndpoints.SEARCH,
-            json={
-                "resultsPerPage": size,
-                "page": page,
-                "sortSearch": "BEST_MATCH",
-                "keywords": [],
-                "publicationPeriod": "LAST_DAY",
-                "occupationUris": [
-                    "http://data.europa.eu/esco/isco/C9",
-                ],
-                "skillUris": [],
-                "requiredExperienceCodes": [],
-                "positionScheduleCodes": [
-                    "NS",
-                    "fulltime",
-                ],
-                "sectorCodes": [
-                    "i",
-                ],
-                "educationAndQualificationLevelCodes": [],
-                "positionOfferingCodes": [],
-                "locationCodes": [
-                    "at",
-                ],
-                "euresFlagCodes": [],
-                "otherBenefitsCodes": [
-                    "1",
-                ],
-                "requiredLanguages": [],
-                "minNumberPost": None,
-                "sessionId": "t8y2effv1rb0pma47adsku",
-            },
+            json=json_data,
         ).json()
-        return [vacancy["id"] for vacancy in response["jvs"]]
+        return [vacancy["id"] for vacancy in response["jvs"]], response["numberRecords"]
 
     def details(self, id: str) -> list[dict[str, Any]]:
         return ApiResponseFormatter().convert_vacancy_details_response(

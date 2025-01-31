@@ -19,7 +19,9 @@ class ApiResponseFormatter:
         """
         phones = contact["communications"].get("telephoneNumbers", [])
         if phones:
-            return ", ".join(f"{phone[0]} {phone[1]} {phone[2]}" for phone in phones)
+            return ", ".join(
+                ["".join(value or "" for value in phone.values()) for phone in phones]
+            )
         return self.extract_phone_numbers(description)
 
     def get_address_lines(self, addresses: list[dict[str, Any]]) -> str:
@@ -27,7 +29,12 @@ class ApiResponseFormatter:
         Formats address lines from a list of address dictionaries.
         """
         return ", ".join(
-            line for address in addresses for line in address.get("addressLines", [])
+            [
+                line
+                for address in addresses
+                for line in address.get("addressLines", [])
+                if line is not None
+            ]
         )
 
     def get_address_details(self, addresses: list[dict[str, Any]]) -> str:
@@ -37,10 +44,10 @@ class ApiResponseFormatter:
         return ", ".join(
             " ".join(
                 [
-                    address.get("countryCode", ""),
-                    address.get("region", ""),
-                    address.get("cityName", ""),
-                    address.get("postalCode", ""),
+                    address.get("countryCode") or "",
+                    address.get("region") or "",
+                    address.get("cityName") or "",
+                    address.get("postalCode") or "",
                 ]
             )
             for address in addresses
@@ -71,8 +78,10 @@ class ApiResponseFormatter:
         result = []
 
         for contact in profile["personContacts"]:
-            addresses = contact["communications"]["addresses"]
+            if contact["communications"] is None:
+                continue
 
+            addresses = contact["communications"]["addresses"]
             result.append(
                 {
                     "title": profile["title"],
